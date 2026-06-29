@@ -1,107 +1,100 @@
 import streamlit as st
 import random
-import pandas as pd
-import plotly.graph_objects as go
+from collections import Counter
 
-st.set_page_config(page_title="PC28 AI V4", layout="wide")
+st.set_page_config(page_title="PC28专业预测平台", layout="wide")
 
-st.title("🚀 PC28 AI专业分析系统 V4")
-
-# =========================
-# PC28生成
-# =========================
-def gen():
-    nums = [random.randint(0,9) for _ in range(3)]
-    total = sum(nums)
-
-    size = "大" if total >= 14 else "小"
-    odd = "单" if total % 2 == 1 else "双"
-
-    combo = size + odd
-    return total, size, odd, combo
+st.title("🧠 PC28专业预测平台（纯分析版）")
 
 # =========================
-# AI预测（升级版）
+# 模拟历史数据（替代真实数据）
 # =========================
-def ai_predict(history):
-    if len(history) < 10:
-        return "大", 0.5
+def generate_history(n=100):
+    data = []
+    for _ in range(n):
+        nums = [random.randint(0, 9) for _ in range(3)]
+        total = sum(nums)
+
+        size = "大" if total >= 14 else "小"
+        odd = "单" if total % 2 == 1 else "双"
+
+        data.append((total, size, odd))
+    return data
+
+history = generate_history(200)
+
+# =========================
+# AI预测核心
+# =========================
+def predict(history):
 
     last = history[-20:]
 
-    big = sum(1 for x in last if x[1] == "大")
-    small = len(last) - big
+    size_count = Counter([x[1] for x in last])
+    odd_count = Counter([x[2] for x in last])
 
-    odd = sum(1 for x in last if x[2] == "单")
-    even = len(last) - odd
-
-    # 趋势判断
-    if big > small:
-        pred = "大"
-        conf = big / len(last)
+    # 大小预测
+    if size_count["大"] > size_count["小"]:
+        size_pred = "大"
+        size_conf = size_count["大"] / 20
     else:
-        pred = "小"
-        conf = small / len(last)
+        size_pred = "小"
+        size_conf = size_count["小"] / 20
 
-    return pred, round(conf, 2)
+    # 单双预测
+    if odd_count["单"] > odd_count["双"]:
+        odd_pred = "单"
+        odd_conf = odd_count["单"] / 20
+    else:
+        odd_pred = "双"
+        odd_conf = odd_count["双"] / 20
+
+    return size_pred, round(size_conf, 2), odd_pred, round(odd_conf, 2)
 
 # =========================
-# 参数
+# 页面展示
 # =========================
-balance = st.number_input("💰 初始资金", value=1000)
-bet = st.number_input("🔢 每次下注", value=10)
-rounds = st.number_input("🔁 模拟局数", value=100)
+
+st.subheader("📊 最近20期走势")
+
+for h in history[-20:]:
+    st.write(f"和:{h[0]} | {h[1]} | {h[2]}")
 
 # =========================
-# 启动
+# AI预测
 # =========================
-if st.button("🚀 开始V4分析"):
+size_pred, size_conf, odd_pred, odd_conf = predict(history)
 
-    history = []
-    money = balance
-    curve = []
+st.subheader("🧠 AI预测结果")
 
-    for _ in range(int(rounds)):
+st.write(f"🎯 大小预测：{size_pred}（概率 {size_conf}）")
+st.write(f"🎯 单双预测：{odd_pred}（概率 {odd_conf}）")
 
-        total, size, odd, combo = gen()
-        history.append((total, size, odd, combo))
+# =========================
+# 趋势分析
+# =========================
+last_10 = history[-10:]
 
-        # 简单下注逻辑（AI）
-        pred, _ = ai_predict(history)
+big = sum(1 for x in last_10 if x[1] == "大")
+small = 10 - big
 
-        win = (pred == size)
+st.subheader("📈 趋势分析（最近10期）")
 
-        if win:
-            money += bet
-        else:
-            money -= bet
+st.write(f"大：{big} 次")
+st.write(f"小：{small} 次")
 
-        curve.append(money)
+if big > small:
+    st.success("当前偏向：大走势")
+else:
+    st.success("当前偏向：小走势")
 
-    # =========================
-    # AI预测
-    # =========================
-    pred, conf = ai_predict(history)
+# =========================
+# 连续性判断
+# =========================
+st.subheader("📉 连续性分析")
 
-    st.subheader("🧠 AI预测结果")
-    st.write(f"预测方向：{pred}")
-    st.write(f"置信度：{conf}")
+last_result = history[-1][1]
 
-    # =========================
-    # 最近记录
-    # =========================
-    st.subheader("📊 最近20期")
+st.write(f"当前连出：{last_result}")
 
-    for h in history[-20:]:
-        st.write(f"和:{h[0]} | {h[1]} | {h[2]} | {h[3]}")
-
-    # =========================
-    # 资金曲线
-    # =========================
-    st.subheader("📈 资金曲线")
-
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(y=curve, name="资金"))
-    st.plotly_chart(fig, use_container_width=True)
-
-    st.success(f"最终资金：{money:.2f}")
+st.info("提示：若连续≥5次同一方向，可能出现反转概率上升")
