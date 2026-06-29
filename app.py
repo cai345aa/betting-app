@@ -1,88 +1,107 @@
 import streamlit as st
 import random
+import pandas as pd
 import plotly.graph_objects as go
 
-st.set_page_config(page_title="模拟投注系统", layout="wide")
+st.set_page_config(page_title="PC28 AI V4", layout="wide")
 
-st.title("🎰 模拟投注回测系统")
-
-# =========================
-# 登录系统（简化）
-# =========================
-if "user" not in st.session_state:
-    st.session_state.user = ""
-
-if st.session_state.user == "":
-    name = st.text_input("请输入用户名")
-    if st.button("登录"):
-        if name.strip():
-            st.session_state.user = name
-            st.rerun()
-    st.stop()
-
-st.success(f"欢迎：{st.session_state.user}")
+st.title("🚀 PC28 AI专业分析系统 V4")
 
 # =========================
-# 参数设置
+# PC28生成
 # =========================
-bankroll = st.number_input("💰 初始资金", value=1000)
-win_rate = st.slider("🎯 胜率", 0.0, 1.0, 0.5)
-odds = st.number_input("⚖️ 赔率", value=2.0)
-rounds = st.number_input("🔁 投注局数", value=100)
-base_bet = st.number_input("🔢 初始下注", value=10)
+def gen():
+    nums = [random.randint(0,9) for _ in range(3)]
+    total = sum(nums)
 
-strategy = st.selectbox("策略选择", ["固定", "马丁", "随机"])
+    size = "大" if total >= 14 else "小"
+    odd = "单" if total % 2 == 1 else "双"
+
+    combo = size + odd
+    return total, size, odd, combo
 
 # =========================
-# 模拟逻辑
+# AI预测（升级版）
 # =========================
-if st.button("🚀 开始模拟"):
+def ai_predict(history):
+    if len(history) < 10:
+        return "大", 0.5
 
-    balance = bankroll
-    bet = base_bet
+    last = history[-20:]
+
+    big = sum(1 for x in last if x[1] == "大")
+    small = len(last) - big
+
+    odd = sum(1 for x in last if x[2] == "单")
+    even = len(last) - odd
+
+    # 趋势判断
+    if big > small:
+        pred = "大"
+        conf = big / len(last)
+    else:
+        pred = "小"
+        conf = small / len(last)
+
+    return pred, round(conf, 2)
+
+# =========================
+# 参数
+# =========================
+balance = st.number_input("💰 初始资金", value=1000)
+bet = st.number_input("🔢 每次下注", value=10)
+rounds = st.number_input("🔁 模拟局数", value=100)
+
+# =========================
+# 启动
+# =========================
+if st.button("🚀 开始V4分析"):
+
     history = []
+    money = balance
+    curve = []
 
     for _ in range(int(rounds)):
 
-        if balance <= 0:
-            break
+        total, size, odd, combo = gen()
+        history.append((total, size, odd, combo))
 
-        win = random.random() < win_rate
+        # 简单下注逻辑（AI）
+        pred, _ = ai_predict(history)
 
-        # 策略
-        if strategy == "固定":
-            current_bet = base_bet
-
-        elif strategy == "马丁":
-            current_bet = bet
-
-        else:
-            current_bet = random.uniform(base_bet * 0.5, base_bet * 1.5)
-
-        current_bet = min(current_bet, balance)
+        win = (pred == size)
 
         if win:
-            balance += current_bet * odds - current_bet
-            if strategy == "马丁":
-                bet = base_bet
+            money += bet
         else:
-            balance -= current_bet
-            if strategy == "马丁":
-                bet *= 2
+            money -= bet
 
-        history.append(balance)
+        curve.append(money)
 
     # =========================
-    # 曲线图
+    # AI预测
     # =========================
+    pred, conf = ai_predict(history)
+
+    st.subheader("🧠 AI预测结果")
+    st.write(f"预测方向：{pred}")
+    st.write(f"置信度：{conf}")
+
+    # =========================
+    # 最近记录
+    # =========================
+    st.subheader("📊 最近20期")
+
+    for h in history[-20:]:
+        st.write(f"和:{h[0]} | {h[1]} | {h[2]} | {h[3]}")
+
+    # =========================
+    # 资金曲线
+    # =========================
+    st.subheader("📈 资金曲线")
+
     fig = go.Figure()
-    fig.add_trace(go.Scatter(y=history, name="资金曲线"))
-    fig.update_layout(
-        title="📊 资金变化曲线",
-        xaxis_title="局数",
-        yaxis_title="资金"
-    )
-
+    fig.add_trace(go.Scatter(y=curve, name="资金"))
     st.plotly_chart(fig, use_container_width=True)
 
-    st.success(f"最终资金：{balance:.2f}")
+    st.success(f"最终资金：{money:.2f}")
